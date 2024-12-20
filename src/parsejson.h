@@ -23,6 +23,7 @@
 #endif
 
 namespace parsejson {
+
 // I'll start simple by storing the whole json in a std::string. This will
 // probably want to be revisited.
 struct ParseBuffer {
@@ -46,6 +47,8 @@ struct JSONItem {
   JSONItem *child = NULL;
   std::string name;
   JSONType type;
+  // potential values, only one of which will be used. should probably
+  // be declared as a proper `union`
   double_t double_val;
   uint64_t uint_val;
   int64_t int_val;

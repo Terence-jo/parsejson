@@ -1,7 +1,7 @@
 /*
  * A simple JSON parser written for my own enjoyment. It utilises recursive
  * descent to assemble an internal representation of the JSON. This
- * representation will be a nested "fat struct" with potentially unused fields
+ * representation will be a nested union struct with potentially unused fields
  * for its value in different types and a type field denoting which is in use.
  * It will have next and prev pointer fields pointing to the next element in
  * either an object or array (dependent on type) and a child field that will be
@@ -40,29 +40,19 @@ double parse_number(ParseBuffer &input_buffer) {
   char *endptr;
   const char *startptr = &input_buffer.raw_json.data()[input_buffer.pos];
   double double_val = strtod(startptr, &endptr);
-  // strtod will siletnly return 0.0 on failure. this case can easily be
-  // checked with the endptr.
   if (endptr == &input_buffer.raw_json[input_buffer.pos]) {
     char msg[100];
     std::snprintf(msg, 100, "bad double at pos: %zu", input_buffer.pos);
     throw ParseError((const char *)msg);
   }
-  // strtod will just stop if it has consumed at least some good double, need to
-  // check that the next character is a comma (after whitespace).
   input_buffer.pos += endptr - startptr;
   return double_val;
 }
 
 std::string parse_string(ParseBuffer &input_buffer) {
   std::string out_str;
-  // the fact that we have a string to parse means that there was a quotation
-  // mark. assume it has been consumed.
   while (input_buffer.raw_json[input_buffer.pos] != '\"' &&
          input_buffer.pos < input_buffer.raw_json.size()) {
-    // need to be ready to escape b, f, n, r, t, '"', '\' and '/'. the letters
-    // will go into the output as \<letter> while the others will go into the
-    // output as-is, ignoring the initial escape \. anything unescaped will just
-    // go into the output. an unrecognised escape sequence will be invalid.
     if (input_buffer.raw_json[input_buffer.pos] != '\\') {
       out_str.append(1, input_buffer.raw_json[input_buffer.pos]);
       input_buffer.pos++;
@@ -126,9 +116,6 @@ JSONItem *parse_array(ParseBuffer &input_buffer) {
   }
   JSONItem *head = NULL;
   JSONItem *current = NULL;
-  // first check for empty array, then parse first element of array and
-  // continue with a do-while loop that terminates on seeing ']'. fail
-  // if the next non-whitespace character after an element is not ','
   while ((input_buffer.raw_json[input_buffer.pos] != ']') &&
          input_buffer.pos < input_buffer.raw_json.size()) {
     skip_whitespace(input_buffer);
@@ -232,8 +219,6 @@ JSONItem *parse_object(ParseBuffer &input_buffer) {
   return head;
 }
 
-// using raw pointers and custom deleter because of challenges using smart
-// pointers in linked listsi (potential stack overflow on deletion).
 void destroy_json(JSONItem *item) {
   // recurse into children, but iterate to the end of the JSON to avoid stack
   // overflow. depth is limited, length is not
